@@ -58,3 +58,7 @@ def {{ function_name }}({{ function_args|join(', ') }}) -> str:
         print("_kale_resource_save: `{{ out_var }}` not found.")
 {%- endfor %}
     # -----------------------DATA SAVING END-----------------------------------
+
+    # Always return a value to make sure we play nicely with the code
+    # injected by KFP
+    return "dummy value"
