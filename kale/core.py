@@ -1,7 +1,10 @@
 import os
 import re
+import copy
+import json
 import pprint
 import logging
+import subprocess
 import logging.handlers
 import tempfile
 
@@ -13,6 +16,14 @@ from shutil import copyfile
 from kale.nbparser import parser
 from kale.static_analysis import dep_analysis
 from kale.codegen import generate_code
+from kale.nb_volumes import list_volumes, get_namespace
+
+NOTEBOOK_SNAPSHOT_COMMIT_MESSAGE = """\
+This is a snapshot of notebook {} in namespace {}.
+
+This snapshot was created by Kale in order to clone the volumes of the notebook
+and use them to spawn a Kubeflow pipeline.\
+"""
 
 
 class Kale:
@@ -44,7 +55,6 @@ class Kale:
         self.pipeline_name = pipeline_name
         self.pipeline_description = pipeline_descr
         self.docker_base_image = docker_image
-        self.volumes = volumes
 
         # setup logging
         self.logger = logging.getLogger("kubeflow-kale")
@@ -69,6 +79,20 @@ class Kale:
         # mute other loggers
         logging.getLogger('urllib3.connectionpool').setLevel(logging.CRITICAL)
 
+        # XXX: Add all notebook volumes by default. This should be removed once the
+        # plugin is updated to allow using the notebook's volumes as pipeline
+        # volumes.
+        volumes = volumes[:] if volumes else []
+        for mount_path, (volume, size) in list_volumes().items():
+            volumes.append({'mount_point': mount_path,
+                            'name': volume.name,
+                            'size': size,
+                            'snapshot': False,
+                            'type': 'clone'})
+
+        # Replace all requested cloned volumes with the snapshotted PVCs
+        self.volumes = self.create_cloned_volumes(volumes)
+
     def validate_metadata(self):
         kale_block_name_regex = r'^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
         kale_name_msg = "must consist of lower case alphanumeric characters or '-', " \
@@ -87,6 +111,59 @@ class Kale:
                     (('snapshot_name' not in v) or not re.match(k8s_valid_name_regex, v['snapshot_name'])):
                 raise ValueError(
                     f"Provide a valid snapshot resource name if you want to snapshot a volume. Snapshot resource name {k8s_name_msg}")
+
+    def run_cmd(self, cmd):
+        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        exit_code = p.wait()
+        out = p.stdout.read()
+        err = p.stderr.read()
+        if exit_code:
+            msg = f"Command '{cmd}' failed with exit code: {exit_code}"
+            self.logger.error("{}:{}".format(msg, err))
+            raise RuntimeError(msg)
+
+        return out
+
+    def _get_cloned_volume(self, volume, snapshot_volumes):
+        for snap in snapshot_volumes:
+            if snap['object_name'] == volume['name']:
+                volume = copy.deepcopy(volume)
+                volume['type'] = 'new_pvc'
+                volume['annotation'] = {'key': 'rok/origin',
+                                        'value': snap['rok_url']}
+                return volume
+
+        msg = f"Volume '{volume['name']}' not found in notebook snapshot"
+        raise ValueError(msg)
+
+    def create_cloned_volumes(self, volumes):
+        if not any(v['type'] == 'clone' for v in volumes):
+            return
+
+        # FIXME: Make sure the bucket exists
+        # FIXME: Import the Rok client instead of spawning external commands
+        namespace = get_namespace()
+        hostname = os.getenv("HOSTNAME")
+        commit_title = f"Snapshot of notebook {hostname}"
+        commit_message = NOTEBOOK_SNAPSHOT_COMMIT_MESSAGE.format(hostname,
+                                                                 namespace)
+        output = self.run_cmd(f"rok-gw -o json object-register jupyter"
+                              f" notebooks '{hostname}' --no-interactive"
+                              f" --param namespace='{namespace}'"
+                              f" --param commit_title='{commit_title}'"
+                              f" --param commit_message='{commit_message}'")
+
+        output = json.loads(output)
+        snapshot_volumes = output['group_members']
+
+        _volumes = []
+        for volume in volumes or []:
+            if volume['type'] == 'clone':
+                volume = self._get_cloned_volume(volume, snapshot_volumes)
+            _volumes.append(volume)
+
+        return _volumes
 
     def run(self):
         self.logger.debug("------------- Kale Start Run -------------")
