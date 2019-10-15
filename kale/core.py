@@ -83,7 +83,7 @@ class Kale:
         # plugin is updated to allow using the notebook's volumes as pipeline
         # volumes.
         volumes = volumes[:] if volumes else []
-        for mount_path, (volume, size) in list_volumes().items():
+        for mount_path, volume, size in list_volumes():
             volumes.append({'mount_point': mount_path,
                             'name': volume.name,
                             'size': size,
