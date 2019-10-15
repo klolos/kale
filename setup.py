@@ -35,11 +35,11 @@ setup(
         'papermill >=1.2, <3.0',
         'dill >=0.3, <0.4'
     ],
-    entry_points={
-        'console_scripts': ['kale=kale.command_line:main', 'kale_server=kale.command_line:server'],
-    },
+    entry_points={'console_scripts':
+                  ['kale=kale.command_line:main',
+                   'kale_server=kale.command_line:server',
+                   'kale-volumes=kale.command_line:kale_volumes']},
     python_requires='>=3.6.0',
     include_package_data=True,
     zip_safe=False
 )
-
