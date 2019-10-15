@@ -35,7 +35,8 @@ def auto_generated_pipeline({{ pipeline_arguments }}):
     {% set name= vol['name'] %}
     {% set mountpoint = vol['mount_point'] %}
     {% set pvc_size = vol['size']|default ('') + vol['size_type']|default ('') %}
-    {% set annotation = vol['annotation'] %}
+    {% set annotations = vol['annotations']|default({}) %}
+
     {% if vol['type'] == 'pv' %}
 
     pvc{{ loop.index }}  = k8s_client.V1PersistentVolumeClaim(
