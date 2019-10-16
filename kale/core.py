@@ -17,7 +17,7 @@ from shutil import copyfile
 from kale.nbparser import parser
 from kale.static_analysis import dep_analysis
 from kale.codegen import generate_code
-from kale.nb_utils import list_volumes, get_namespace
+from kale.utils.pod_utils import list_volumes, get_namespace
 
 NOTEBOOK_SNAPSHOT_COMMIT_MESSAGE = """\
 This is a snapshot of notebook {} in namespace {}.
