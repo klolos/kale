@@ -65,14 +65,16 @@ def auto_generated_pipeline({{ pipeline_arguments }}):
     volume = dsl.PipelineVolume(pvc=vol_{{ mountpoint.replace('/', '_').strip('_') }})
 
     {% elif vol['type'] == 'new_pvc' %}
+    {% if annotations.get('rok/origin') %}
+    annotations['rok/origin'] = rok_{{ name.replace('-', '_') }}_url
+    {% elif annotations %}
+    {% endif %}
 
     vop{{ loop.index }} = dsl.VolumeOp(
         name='create-volume-{{ loop.index }}',
         resource_name='{{ name }}',
-        {% if annotation['key'] == 'rok/origin' -%}
-        annotations={"{{ annotation['key'] }}": rok_{{ name.replace('-', '_') }}_url},
-        {% elif annotation != {key: '', value: ''} -%}
-        annotations={"{{ annotation['key'] }}": vol_{{ name.replace('-', '_') }}},
+        {%- if annotations %}
+        annotations={{ annotations }}
         {%- endif %}
         size='{{ pvc_size }}'
     )
