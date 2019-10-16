@@ -30,11 +30,12 @@ def gen_kfp_code(nb_graph, experiment_name, pipeline_name, pipeline_description,
     # Dictionary of steps defining the dependency graph
     function_prevs = dict()
 
-    # Convert annotations to a dictionary
+    # Convert annotations to a dictionary and convert size to a string
     for v in volumes:
         annotations = {a['key']: a['value'] for a in v.get('annotations', {})
                        if a['key'] != '' and a['value'] != ''}
         v['annotations'] = annotations
+        v['size'] = str(v['size'])
 
     # Include all volumes as pipeline parameters
     for v in volumes:
