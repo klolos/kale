@@ -194,8 +194,13 @@ def snapshot_pipeline_step(pipeline, step, nb_path):
           " Rok snapshot:")
 
     # FIXME: How do we retrieve the base URL of the ROK UI?
+    ui_base_url = "http://10.10.13.10:8080"
     version = task_info["task"]["result"]["event"]["version"]
-    print("\n/rok/buckets/%s/files/%s/versions/%s\n" % (bucket, obj, version))
+    print()
+    print("%s/rok/buckets/%s/files/%s/versions/%s"
+          % (ui_base_url, bucket, obj, version))
+    print("/rok/buckets/%s/files/%s/versions/%s" % (bucket, obj, version))
+    print()
 
 
 def get_run_uuid():
